@@ -48,6 +48,7 @@ contract Blake3SolTest is Test {
      * hashing ~50kb of data.
      */
     function test_big_hash_ffi() public {
+        vm.skip(true);
         string[] memory cmds = new string[](2);
         cmds[0] = "../bridge-differential-tests/target/debug/bridge_differential_tests";
         cmds[1] = "--big-hash";

@@ -1,0 +1,95 @@
+/// @title Blake3
+/// @notice SPDX-License-Identifier: MIT
+/// @author emo.eth <https://github.com/jameswenzel>
+
+
+#define constant MSG_PERMUTATION = 0x0206030A0700040D010B0C05090E0F0800000000000000000000000000000000
+#define constant IV = 0x6a09e667bb67ae853c6ef372a54ff53a510e527f9b05688c1f83d9ab5be0cd19
+#define constant MSG_PERMUTATION_OFFSET = 0x00
+#define constant IV_OFFSET = 0x200
+#define constant STATE_OFFSET = 0x300
+
+#define table CONSTANTS {
+    0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000d0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000b000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000f0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000006a09e66700000000000000000000000000000000000000000000000000000000bb67ae85000000000000000000000000000000000000000000000000000000003c6ef37200000000000000000000000000000000000000000000000000000000a54ff53a00000000000000000000000000000000000000000000000000000000510e527f000000000000000000000000000000000000000000000000000000009b05688c000000000000000000000000000000000000000000000000000000001f83d9ab000000000000000000000000000000000000000000000000000000005be0cd19
+}
+
+#define macro MAIN() {
+    COPY_TABLE(CONSTANTS, 0x00)
+}
+
+///@notice Copies an entire table to a destination in memory
+#define macro COPY_TABLE(table, dest) takes (0) returns (0) {
+    __tablesize(<table>)  // [__tablesize(<table>)]
+    __tablestart(<table>) // [__tablestart(<table>), __tablesize(<table>)]
+    <dest>                // [<dest>, __tablestart(<table>), __tablesize(<table>)]
+    codecopy              // []
+}
+
+
+///@notice Load index i of IV onto the stack
+#define macro INDEX_IV() takes (1) returns (1) {
+              // [index]
+    // multiply index by 32 bytes to get relative memory location offset
+    0x05      // [0x05, index]
+    shl       // [(index << 0x05)]
+    // add this relative offset to absolute location of IV
+    [IV_OFFSET] // [IV_OFFSET, (index << 0x05)]
+    add         // [(IV_OFFSET + (index << 0x05))]
+    // load onto stack
+    mload       // [mload[(IV_OFFSET + (index << 0x05))]]
+    
+    // LOAD_IV() // [IV, index]
+    // swap1     // [index, IV]
+    // 0x05      // [0x05, index, IV]
+    // shl       // [(index << 0x05), IV]
+    // 224       // [224, (index << 0x05), IV]
+    // sub       // [(224 - (index << 0x05)), IV]
+    // shr       // [(IV >> (224 - (index << 0x05)))]
+    // MASK_32() // [masked]
+}
+
+///@notice Load index i of MSG_PERMUTATION onto the stack
+#define macro INDEX_MSG_PERMUTATION() takes (1) returns (1) {
+                           // [index]
+    // multiply index by 32 bytes to get relative memory location offset
+    0x05                   // [0x05, index]
+    shl                    // [(index << 0x05)]
+    // not necessary to calculate absolute since MSG_PERMUTATION always starts at 0
+    // [MSG_PERMUTATION_OFFSET] // [MSG_PERMUTATION_OFFSET, (index << 0x05)]
+    // add                      // [(MSG_PERMUTATION_OFFSET + (index << 0x05))]
+    mload                  // [mload[(index << 0x05)]]
+    
+    // LOAD_MSG_PERMUTATION() // [MSG_PERMUTATION, index]
+    // swap1                  // [index, MSG_PERMUTATION]
+    // byte                   // [MSG_PERMUTATION[index]]
+    
+}
+
+///@notice Mask a 32 bit value
+#define macro MASK_32() takes (1) returns (1) {
+               // [$0]
+    0xffffffff // [0xffffffff, $0]
+    and        // [(0xffffffff & $0)]
+}
+
+///@notice Right rotate a 32 bit value by n bits
+#define macro RROT() takes (2) returns (1) {
+    // [x, n]
+    dup1 // [x, x, n]
+    dup3 // [n, x, x, n]
+    0x20 // [0x20, n, x, x, n]
+    sub  // [(0x20 - n), x, x, n]
+    shl  // [(x << (0x20 - n)), x, n]
+    swap2 // [n, x, (x << (0x20 - n))]
+    shr   // [(x >> n), (x << (0x20 - n))]
+    or    // [((x >> n) | (x << (0x20 - n)))]
+    MASK_32() // [masked] 
+}
+
+///@notice add two 32 bit values and mask the result
+#define macro ADD_32() takes (2) returns (1) {
+              // [x, y]
+    add       // [(x + y)]
+    MASK_32() // [(x + y)']   
+}
+

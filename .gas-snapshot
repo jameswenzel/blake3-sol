@@ -1,0 +1,4 @@
+Blake3SolTest:test_big_hash_ffi() (gas: 0)
+Blake3SolTest:test_hash() (gas: 857348)
+Blake3SolTest:test_keyed_hash() (gas: 863101)
+Blake3SolTest:test_keyed_hash_thirty_times() (gas: 33920217)
