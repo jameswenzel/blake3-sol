@@ -7,36 +7,281 @@
 #define constant IV = 0x6a09e667bb67ae853c6ef372a54ff53a510e527f9b05688c1f83d9ab5be0cd19
 #define constant MSG_PERMUTATION_OFFSET = 0x00
 #define constant IV_OFFSET = 0x200
-#define constant STATE_OFFSET = 0x300
 
-#define table CONSTANTS {
+#define constant CHUNKSTATE_BLOCK_OFFSET = 0x300
+#define constant CHUNKSTATE_CHAINING_VALUE_OFFSET = 0x500
+#define constant CHUNKSTATE_COUNTER_OFFSET = 0x600
+#define constant CHUNKSTATE_BLOCK_LEN_OFFSET = 0x620
+#define constant CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET = 0x640
+#define constant CHUNKSTATE_FLAGS_OFFSET = 0x660
+
+#define constant HASHER_FLAGS_OFFSET = 0x680
+#define constant OUTPUT_FLAGS_OFFSET = 0x6a0
+#define constant OUTPUT_COUNTER_OFFSET = 0x6c0
+#define constant OUTPUT_BLOCK_LEN_OFFSET = 0x6e0
+
+#define constant OUTPUT_BLOCK_OFFSET = 0x700
+#define constant OUTPUT_CHAINING_VALUE_OFFSET = 0x900
+
+#define constant CV_STACK_LEN_OFFSET = 0xa00
+#define constant CV_STACK_OFFSET = 0xa20
+
+
+#define constant BLOCK_LEN = 0x40
+#define constant CHUNK_LEN = 0x400
+///@dev flags
+#define constant CHUNK_START = 0x01
+#define constant CHUNK_END = 0x02
+#define constant PARENT = 0x04
+#define constant ROOT = 0x08
+#define constant KEYED_HASH = 0x10
+#define constant DERIVE_KEY_CONTEXT = 0x20
+#define constant DERIVE_KEY_MATERIAL = 0x40
+
+
+#define table BLAKE3_CONSTANTS = {
     0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000d0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000b000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000f0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000006a09e66700000000000000000000000000000000000000000000000000000000bb67ae85000000000000000000000000000000000000000000000000000000003c6ef37200000000000000000000000000000000000000000000000000000000a54ff53a00000000000000000000000000000000000000000000000000000000510e527f000000000000000000000000000000000000000000000000000000009b05688c000000000000000000000000000000000000000000000000000000001f83d9ab000000000000000000000000000000000000000000000000000000005be0cd19
 }
 
-#define macro MAIN() {
-    COPY_TABLE(CONSTANTS, 0x00)
+#define macro MAIN() = {
+    COPY_VALS()
 }
 
 ///@notice Copies an entire table to a destination in memory
-#define macro COPY_TABLE(table, dest) takes (0) returns (0) {
-    __tablesize(<table>)  // [__tablesize(<table>)]
-    __tablestart(<table>) // [__tablestart(<table>), __tablesize(<table>)]
-    <dest>                // [<dest>, __tablestart(<table>), __tablesize(<table>)]
-    codecopy              // []
+#define macro COPY_VALS() = takes (0) returns (0) {
+    __tablesize(BLAKE3_CONSTANTS)  // [__tablesize(<table>)]
+    __tablestart(BLAKE3_CONSTANTS) // [__tablestart(<table>), __tablesize(<table>)]
+    0x00                           // [<dest>, __tablestart(<table>), __tablesize(<table>)]
+    codecopy                       // []
+}
+
+#define macro INDEX_OFFSET(offset) = takes (1) returns (1) {
+             // [index]
+    0x05     // [0x05, index]
+    shl      // [(index << 0x05)]
+    <offset> // [<offset>, (index << 0x05)]
+    add      // [(<offset> + (index << 0x05))]
 }
 
 
-///@notice Load index i of IV onto the stack
-#define macro INDEX_IV() takes (1) returns (1) {
-              // [index]
-    // multiply index by 32 bytes to get relative memory location offset
-    0x05      // [0x05, index]
-    shl       // [(index << 0x05)]
-    // add this relative offset to absolute location of IV
-    [IV_OFFSET] // [IV_OFFSET, (index << 0x05)]
-    add         // [(IV_OFFSET + (index << 0x05))]
+#define macro GET_INDEX(offset) = takes (1) returns (1) {
+                         // [index]
+    INDEX_OFFSET(offset) // [offset]
     // load onto stack
-    mload       // [mload[(IV_OFFSET + (index << 0x05))]]
+    mload                // [mload[offset]]
+}
+
+
+
+#define macro PERMUTE_CHUNKSTATE() = takes(0) returns (0)  {
+    ///@dev 2
+    0x340     // [0x340]
+    mload     // [mload[0x340]]
+    ///@dev 6
+    0x3c0     // [0x3c0, mload[0x340]]
+    mload     // [mload[0x3c0], mload[0x340]]
+    ///@dev 3
+    0x360     // [0x360, mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 10
+    0x440     // [0x440, mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 7
+    0x3e0     // [0x3e0, mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 0
+    0x300     // [0x300, mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 4
+    0x380     // [0x380, mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 13
+    0x4a0     // [0x4a0, mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 1
+    0x320     // [0x320, mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 11
+    0x460     // [0x460, mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 12
+    0x480     // [0x480, mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 5
+    0x3a0     // [0x3a0, mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 9
+    0x420     // [0x420, mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 14
+    0x4c0     // [0x4c0, mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 15
+    0x4e0     // [0x4e0, mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 8
+    0x400     // [0x400, mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mload     // [mload[0x400], mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 15
+    0x4e0     // [0x4e0, mload[0x400], mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 14
+    0x4c0     // [0x4c0, mload[0x4e0], mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 13
+    0x4a0     // [0x4a0, mload[0x4c0], mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 12
+    0x480     // [0x480, mload[0x420], mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 11
+    0x460     // [0x460, mload[0x3a0], mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 10
+    0x440     // [0x440, mload[0x480], mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 9
+    0x420     // [0x420, mload[0x460], mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 8
+    0x400     // [0x400, mload[0x320], mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 7
+    0x3e0     // [0x3e0, mload[0x4a0], mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 6
+    0x3c0     // [0x3c0, mload[0x380], mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 5
+    0x3a0     // [0x3a0, mload[0x300], mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 4
+    0x380     // [0x380, mload[0x3e0], mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 3
+    0x360     // [0x360, mload[0x440], mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x360], mload[0x3c0], mload[0x340]]
+    ///@dev 2     
+    0x340     // [0x340, mload[0x360], mload[0x3c0], mload[0x340]]
+    mstore    // [mload[0x3c0], mload[0x340]]
+    ///@dev 1
+    0x320     // [0x320, mload[0x3c0], mload[0x340]] 
+    mstore    // [mload[0x340]]
+    ///@dev 0
+    0x300     // [0x300, mload[0x340]] 
+    mstore    // []
+}
+
+#define macro PERMUTE_OUTPUT() = takes(0) returns (0)  {
+    ///@dev 2
+    0x740     // [0x740]
+    mload     // [mload[0x740]]
+    ///@dev 6
+    0x7c0     // [0x7c0, mload[0x740]]
+    mload     // [mload[0x7c0], mload[0x740]]
+    ///@dev 3
+    0x760     // [0x760, mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 10
+    0x940     // [0x940, mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 7
+    0x7e0     // [0x7e0, mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 0
+    0x700     // [0x700, mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 4
+    0x780     // [0x780, mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 13
+    0x9a0     // [0x9a0, mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 1
+    0x720     // [0x720, mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 11
+    0x960     // [0x960, mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 12
+    0x980     // [0x980, mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 5
+    0x7a0     // [0x7a0, mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 9
+    0x920     // [0x920, mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 14
+    0x9c0     // [0x9c0, mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 15
+    0x9e0     // [0x9e0, mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 8
+    0x900     // [0x900, mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mload     // [mload[0x900], mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 15
+    0x9e0     // [0x9e0, mload[0x900], mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 14
+    0x9c0     // [0x9c0, mload[0x9e0], mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 13
+    0x9a0     // [0x9a0, mload[0x9c0], mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 12
+    0x980     // [0x980, mload[0x920], mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 11
+    0x960     // [0x960, mload[0x7a0], mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 10
+    0x940     // [0x940, mload[0x980], mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 9
+    0x920     // [0x920, mload[0x960], mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 8
+    0x900     // [0x900, mload[0x720], mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 7
+    0x7e0     // [0x7e0, mload[0x9a0], mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 6
+    0x7c0     // [0x7c0, mload[0x780], mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 5
+    0x7a0     // [0x7a0, mload[0x700], mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 4
+    0x780     // [0x780, mload[0x7e0], mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 3
+    0x760     // [0x760, mload[0x940], mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x760], mload[0x7c0], mload[0x740]]
+    ///@dev 2     
+    0x740     // [0x740, mload[0x760], mload[0x7c0], mload[0x740]]
+    mstore    // [mload[0x7c0], mload[0x740]]
+    ///@dev 1
+    0x720     // [0x720, mload[0x7c0], mload[0x740]] 
+    mstore    // [mload[0x740]]
+    ///@dev 0
+    0x700     // [0x700, mload[0x740]] 
+    mstore    // []
+}
+
+
+#define macro STORE_INDEX(offset) = takes (2) returns (0) {
+                         // [index, value]
+    INDEX_OFFSET(offset) // [offset, value]
+    // store from stack
+    mstore               // []
+}
+
+///@notice Load index i of IV onto the stack
+#define macro INDEX_IV() = takes (1) returns (1) {
+    GET_INDEX(IV_OFFSET)
     
     // LOAD_IV() // [IV, index]
     // swap1     // [index, IV]
@@ -49,14 +294,12 @@
 }
 
 ///@notice Load index i of MSG_PERMUTATION onto the stack
-#define macro INDEX_MSG_PERMUTATION() takes (1) returns (1) {
+#define macro INDEX_MSG_PERMUTATION() =  takes (1) returns (1) {
                            // [index]
     // multiply index by 32 bytes to get relative memory location offset
     0x05                   // [0x05, index]
     shl                    // [(index << 0x05)]
     // not necessary to calculate absolute since MSG_PERMUTATION always starts at 0
-    // [MSG_PERMUTATION_OFFSET] // [MSG_PERMUTATION_OFFSET, (index << 0x05)]
-    // add                      // [(MSG_PERMUTATION_OFFSET + (index << 0x05))]
     mload                  // [mload[(index << 0x05)]]
     
     // LOAD_MSG_PERMUTATION() // [MSG_PERMUTATION, index]
@@ -65,31 +308,259 @@
     
 }
 
+#define macro INDEX_STATE() = takes (1) returns (1) {
+    GET_INDEX(STATE_OFFSET)
+}
+
+
+#define macro COPY_FIRST_8_FROM_STATE_TO_CHAINING_VALUE(state_offset, chaining_value_offset) = takes (0) returns (0) {
+    MCOPY(state_offset, 0x100, chaining_value_offset, 0x100)
+}
+
+
+#define macro MCOPY(arg_offset, arg_size, ret_offset, ret_size) = takes (0) returns (0) {
+    <ret_size> // [<ret_size>]
+    <ret_offset>// [<ret_offset>, <ret_size>]
+    <arg_size> // [<arg_size>, <ret_offset>, <ret_size>]
+    <arg_offset>// [<arg_offset>, <arg_size>, <ret_offset>, <ret_size>]
+    0x04       // [0x04, <arg_offset>, <arg_size>, <ret_offset>, <ret_size>]
+    gas        // [gas, 0x04, <arg_offset>, <arg_size>, <ret_offset>, <ret_size>]
+    staticcall // [success]
+    pop        // []
+    
+}
+
+#define macro g(a, b, c, d) = takes (2) returns (0) {
+
+    // The mixing function, G, which mixes either a column or a diagonal.
+// def g(state: list[int], a: int, b: int, c: int, d: int, mx: int, my: int) -> None:
+    // a_val = state[a]
+    // b_val = state[b]
+    // c_val = state[c]
+    // d_val = state[d]
+
+    // a_prime = add32(a_val, add32(b_val, mx))
+    // d_prime = rightrotate32(d_val ^ a_prime, 16)
+    // c_prime = add32(c_val, d_val)
+    // b_prime = rightrotate32(b_val ^ c_prime, 12)
+
+    // a_final = add32(a_prime, add32(b_prime, my))
+    // d_final = rightrotate32(d_prime ^ a_final, 8)
+    // c_final = add32(c_prime, d_final)
+    // b_final = rightrotate32(b_prime ^ c_final, 7)
+
+    // state[a] = a_final
+    // state[b] = b_final
+    // state[c] = c_final
+    // state[d] = d_final
+    
+
+    // [mx, my]
+
+    /// @dev load all values from state onto stack
+    // dup to copy values since they will need to be accessed later
+    <d> // [<d>, mx, my]
+    GET_INDEX(STATE_OFFSET)// [d_val, mx, my]
+    <c>                    // [<c>, d_val, mx, my]
+    GET_INDEX(STATE_OFFSET) // [c_val, d_val, mx, my]
+    <b>                     // [<b>, c_val, d_val, mx, my]
+    GET_INDEX(STATE_OFFSET) // [b_val, c_val, d_val, mx, my]
+    <a>                     // [<a>, b_val, c_val, d_val, mx, my]
+    GET_INDEX(STATE_OFFSET) // [a_val, b_val, c_val, d_val, mx, my]
+
+
+    /// @dev calculate a_prime: add32(a_val, add32(b_val, mx))
+    swap1                   // [b_val, a_val, c_val, d_val, mx, my]
+    // mx is only used once
+    swap4                   // [mx, a_val, c_val, d_val, b_val, my]                   
+    dup5                    // [b_val, mx, a_val, c_val, d_val, b_val, my]
+    ADD_32()                // [(b_val + mx), a_val, c_val, d_val, b_val, my]
+    ADD_32()                // [a_prime, c_val, d_val, b_val, my]
+    
+    /// @dev calcuate d_prime: rightrotate32(d_val ^ a_prime, 16)
+    dup1                    // [a_prime, a_prime, c_val, d_val, b_val, my]
+    dup4                    // [d_val, a_prime, a_prime, c_val, d_val, b_val, my]
+    xor                     // [(d_val ^ a_prime), a_prime, c_val, d_val, b_val, my]
+    RROT(0x10)              // [d_prime, a_prime, c_val, d_val, b_val, my]
+
+    /// @dev calculate c_prime: add32(c_val, d_val)
+    swap2                   // [c_val, a_prime, d_prime, d_val, b_val, my]
+    swap1                   // [a_prime, c_val, d_prime, d_val, b_val, my]
+    swap3                   // [d_val, c_val, d_prime, a_prime, b_val, my]
+    ADD_32()                // [c_prime, d_prime, a_prime, b_val, my]
+
+    /// @dev calculate b_prime: rightrotate32(b_val ^ c_prime, 12)
+    dup1                    // [c_prime, c_prime, d_prime, a_prime, b_val, my]
+    swap4                   // [b_val, c_prime, d_prime, a_prime, c_prime, my]
+    xor                     // [(b_val ^ c_prime), d_prime, a_prime, c_prime, my]
+    RROT(0x0c)                // [b_prime, d_prime, a_prime, c_prime, my]
+
+    /// @dev calculate a_final: add32(a_prime, add32(b_prime, my))
+    dup1                    // [b_prime, b_prime, d_prime, a_prime, c_prime, my]
+    swap5                   // [my, b_prime, d_prime, a_prime, c_prime, b_prime]
+    ADD_32()                // [(my + b_prime), d_prime, a_prime, c_prime, b_prime]
+    swap1                   // [d_prime, (my + b_prime), a_prime, c_prime, b_prime]
+    swap2                   // [a_prime, (my + b_prime), d_prime, c_prime, b_prime]
+    ADD_32()                // [a_final, d_prime, c_prime, b_prime]
+
+
+    /// @dev calculate d_final: rightrotate32(d_prime ^ a_final, 8)
+    dup1                    // [a_final, a_final, d_prime, c_prime, b_prime]
+    swap2                   // [d_prime, a_final, a_final, c_prime, b_prime]
+    xor                     // [(d_prime ^ a_final), a_final, c_prime, b_prime]
+    RROT(0x08)                 // [d_final, a_final, c_prime, b_prime]
+    
+    /// @dev calculate c_final: add32(c_prime, d_final)
+    dup1                    // [d_final, d_final, a_final, c_prime, b_prime]
+    swap3                   // [c_prime, d_final, a_final, d_final, b_prime]
+    ADD_32()                // [c_final, a_final, d_final, b_prime]
+
+    /// @dev calculate b_final: rightrotate32(b_prime ^ c_final, 7)
+    dup1                    // [c_final, c_final, a_final, d_final, b_prime]
+    swap4                   // [b_prime, c_final, a_final, d_final, c_final]
+    xor                     // [(b_prime ^ c_final), a_final, d_final, c_final]
+    RROT(0x07)                 // [b_final, a_final, d_final, c_final]
+
+    /// @dev store values back into state in memory
+    <b>                      // [<b>, b_final, a_final, d_final, c_final]
+    STORE_INDEX(STATE_OFFSET)// [a_final, d_final, c_final]
+    <a>                      // [<a>, a_final, d_final, c_final]
+    STORE_INDEX(STATE_OFFSET)// [d_final, c_final]
+    <d>                      // [<d>, d_final, c_final]
+    STORE_INDEX(STATE_OFFSET)// [c_final]
+    <c>                      // [<c>, c_final]    
+    STORE_INDEX(STATE_OFFSET)// [c, c_final]
+
+}
+
 ///@notice Mask a 32 bit value
-#define macro MASK_32() takes (1) returns (1) {
+#define macro MASK_32() = takes (1) returns (1) {
                // [$0]
     0xffffffff // [0xffffffff, $0]
     and        // [(0xffffffff & $0)]
 }
 
 ///@notice Right rotate a 32 bit value by n bits
-#define macro RROT() takes (2) returns (1) {
-    // [x, n]
-    dup1 // [x, x, n]
-    dup3 // [n, x, x, n]
-    0x20 // [0x20, n, x, x, n]
-    sub  // [(0x20 - n), x, x, n]
-    shl  // [(x << (0x20 - n)), x, n]
-    swap2 // [n, x, (x << (0x20 - n))]
-    shr   // [(x >> n), (x << (0x20 - n))]
-    or    // [((x >> n) | (x << (0x20 - n)))]
+#define macro RROT(n) = takes (1) returns (1) {
+              // [x]
+    dup1      // [x, x]
+    <n>       // [<n>, x, x]
+    swap2     // [x, x, <n>]
+    dup3      // [<n>, x, x, <n>]
+    0x20      // [0x20, n, x, x, n]
+    sub       // [(0x20 - n), x, x, n]
+    shl       // [(x << (0x20 - n)), x, n]
+    swap2     // [n, x, (x << (0x20 - n))]
+    shr       // [(x >> n), (x << (0x20 - n))]
+    or        // [((x >> n) | (x << (0x20 - n)))]
     MASK_32() // [masked] 
 }
 
 ///@notice add two 32 bit values and mask the result
-#define macro ADD_32() takes (2) returns (1) {
+#define macro ADD_32() = takes (2) returns (1) {
               // [x, y]
     add       // [(x + y)]
-    MASK_32() // [(x + y)']   
+    MASK_32() // [(x + y)']   x
 }
+
+#define macro MIN() = takes(2) returns (1) {
+    // [x, y]
+    dup1 // [x, x, y]
+    dup2 // [y, x, x, y]
+    // if x < y, should return x
+    lt   // [(x < y), x, y]
+    dup1  // [(x < y), (x < y), x, y]
+    // if y >= x, should return y
+    iszero// [((x < y) == 0), (x < y), x, y]
+    swap2 // [x, (x < y), ((x < y) == 0), y]
+    // if x < y, this evaluates to x
+    mul   // [(x * (x < y)), ((x < y) == 0), y]
+    swap2 // [y, ((x < y) == 0), (x * (x < y))]
+    // if x >= y, this evaluates to y
+    mul   // [(y * ((x < y) == 0)), (x * (x < y))]
+    // bitwise OR to get either x or y
+    or    // [((y * ((x < y) == 0)) | (x * (x < y)))]
+}
+
+
+#define macro HASHER_UPDATE() = takes(0) returns (0) {
+    0x00 // [input_offset]
+
+    /// @dev perform initial loop check
+    calldatasize// [size, input_offset]
+    dup2        // [input_offset, size, input_offset]
+    lt          // [(input_offset < size), input_offset]
+    /// @dev if input_offset >= size, jump to done
+    iszero      // [((input_offset < size) == 0), input_offset]
+    [done]      // [done, ((input_offset < size) == 0), input_offset]
+    jumpi       // [input_offset]
+    
+
+    loop:
+        /// @dev if (CHUNKSTATE_LEN() == CHUNK_LEN) {...}
+        CHUNKSTATE_LEN() // [CHUNKSTATE_LEN, input_offset]
+        [CHUNK_LEN]       // [CHUNK_LEN, CHUNKSTATE_LEN, input_offset]
+        eq                // [(CHUNK_LEN == CHUNKSTATE_LEN), input_offset]
+    ///@dev if CHUNKSTATE_LEN() != CHUNK_LEN, jump to chunk_incomplete
+        iszero            // [(CHUNK_LEN != CHUNKSTATE_LEN), input_offset]
+        [chunk_incomplete]  // [chunk_incomplete, ((CHUNK_LEN == CHUNKSTATE_LEN) == 0), input_offset]
+        jumpi             // [input_offset]
+            dup1          // [input_offset, input_offset]
+            
+            FINALIZE_AND_RESET_CHUNK_STATE() // [input_offset]
+    
+    chunk_incomplete:
+    ///@dev calculate "want"
+        CHUNKSTATE_LEN() // [CHUNKSTATE_LEN, input_offset]
+        [CHUNK_LEN]       // [CHUNK_LEN, CHUNKSTATE_LEN, input_offset]
+        sub               // [want, input_offset]
+    ///@dev calculate "remaining"
+        dup2              // [input_offset, want, input_offset]
+        calldatasize      // [size, input_offset, want, input_offset]
+        sub               // [remaining, want, input_offset]
+    ///@dev min of "want" and "remaining" is "take"
+        MIN()             // [take, input_offset]
+        dup2              // [input_offset, take, input_offset]
+        dup2              // [take, input_offset, take, input_offset]
+        
+        
+        
+        UPDATE_CHUNKSTATE() // [take, input_offset]
+        add                 // [new_input_offset]
+
+        calldatasize        // [size, new_input_offset]
+        dup2                // [new_input_offset, size, new_input_offset]
+        lt                  // [(new_input_offset < size), new_input_offset]
+        [loop]              // [loop, (new_input_offset < size), new_input_offset]
+        jumpi
+        
+    done:
+        pop               // []
+        
+}
+
+#define macro UPDATE_CHUNKSTATE() = takes(2) returns (0) {
+    CHUNKSTATE_LEN() // [CHUNKSTATE_LEN, take, input_offset]
+    0x00                     // [0x00, CHUNKSTATE_LEN, take, input_offset]
+
+    swap2// [index_offset, take, i]
+    
+    loop:
+        dup3// [index_offset, 0x00, take, index_offset]
+        
+} 
+
+#define macro CHUNKSTATE_LEN() = takes(0) returns (1) {
+    [BLOCK_LEN]                          // [BLOCK_LEN]
+    [CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET]// [CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET, BLOCK_LEN]
+    mload                                // [mload[CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET], BLOCK_LEN]
+    mul                                  // [(mload[CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET] * BLOCK_LEN)]
+    [CHUNKSTATE_BLOCK_LEN_OFFSET]        // [CHUNKSTATE_BLOCK_LEN_OFFSET, (mload[CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET] * BLOCK_LEN)]
+    mload                                // [mload[CHUNKSTATE_BLOCK_LEN_OFFSET], (mload[CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET] * BLOCK_LEN)]
+    add                                  // [(mload[CHUNKSTATE_BLOCK_LEN_OFFSET] + (mload[CHUNKSTATE_BLOCKS_COMPRESSED_OFFSET] * BLOCK_LEN))]
+    
+}
+
+#define macro FINALIZE_AND_RESET_CHUNK_STATE() = takes(1) returns (0) {}
+
 
